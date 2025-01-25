@@ -47,7 +47,7 @@ bool USpoutReceiver::Connect(
 	if (bIsReceiving)
 	{
 		TickProvider = new FTickProvider(FrameRate);
-		TickProvider->Tick.AddUObject(this, &USpoutReceiver::Tick);
+		TickProvider->Tick.AddUObject(this, &USpoutReceiver::TickThread);
 	}
 	
 	return bIsReceiving;
@@ -59,7 +59,7 @@ void USpoutReceiver::StopReceive()
 	bIsReceiving = false;
 }
 
-void USpoutReceiver::Tick() const
+void USpoutReceiver::TickThread() const
 {
 	if (!Receiver.IsValid() || !bIsReceiving) return;
 	Receiver->ReceiveCurrentFrame();

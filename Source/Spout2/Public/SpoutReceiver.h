@@ -24,7 +24,7 @@ public:
 	bool GetFirstSource(FString& Name) const;
 
 	UFUNCTION(BlueprintCallable, Category="SpoutReceiver")
-	bool Connect(const FString Name, UTextureRenderTarget2D* Output, const double FrameRate);
+	bool Connect(const FString Name, UTextureRenderTarget2D* Output, const double FrameRate = 60.0);
 
 	UFUNCTION(BlueprintCallable, Category="SpoutReceiver")
 	void StopReceive();
@@ -37,5 +37,5 @@ private:
 	TSharedPtr<SpoutReceiver> Receiver;
 	FTickProvider* TickProvider;
 	bool bIsReceiving = false;
-	void Tick() const;
+	void TickThread() const;
 };

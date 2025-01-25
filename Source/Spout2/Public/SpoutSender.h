@@ -14,7 +14,7 @@ public:
 	virtual void BeginDestroy() override;
 
 	UFUNCTION(BlueprintCallable, Category = "SpoutSender")
-	bool Start(const FString& SenderName, UTextureRenderTarget2D* Source, const double FrameRate);
+	bool Start(const FString& SenderName, UTextureRenderTarget2D* Source, const double FrameRate = 60.0);
 
 	UFUNCTION(BlueprintCallable, Category = "SpoutSender")
 	void Stop();
@@ -27,5 +27,5 @@ private:
 	FTickProvider* TickProvider;
 	bool bIsInitialized = false;
 
-	void Tick() const;
+	void TickThread() const;
 };
