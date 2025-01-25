@@ -28,10 +28,10 @@ bool USpoutReceiver::GetFirstSource(FString& Name) const
 	return bSuccess;
 }
 
-void USpoutReceiver::ChangeFrameRate(double value)
+void USpoutReceiver::ChangeFrameRate(const double FrameRate)
 {
 	if (!TickProvider) return;
-	TickProvider->SetFPS(value);
+	TickProvider->SetFPS(FrameRate);
 }
 
 bool USpoutReceiver::Connect(

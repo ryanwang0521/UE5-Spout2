@@ -30,7 +30,7 @@ public:
 	void StopReceive();
 
 	UFUNCTION(BlueprintCallable, Category = "SpoutReceiver")
-	void ChangeFrameRate(double value);
+	void ChangeFrameRate(const double FrameRate = 60.0);
 
 
 private:

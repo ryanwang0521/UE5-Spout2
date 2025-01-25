@@ -20,7 +20,7 @@ public:
 	void Stop();
 
 	UFUNCTION(BlueprintCallable, Category = "SpoutSender")
-	void ChangeFrameRate(double value);
+	void ChangeFrameRate(const double FrameRate = 60.0);
 
 private:
 	TSharedPtr<SpoutSender> Sender;

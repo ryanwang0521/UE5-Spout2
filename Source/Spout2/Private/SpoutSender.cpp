@@ -39,10 +39,10 @@ void USpoutSender::Stop()
 	bIsInitialized = false;
 }
 
-void USpoutSender::ChangeFrameRate(double value)
+void USpoutSender::ChangeFrameRate(const double FrameRate)
 {
 	if (!TickProvider) return;
-	TickProvider->SetFPS(value);
+	TickProvider->SetFPS(FrameRate);
 }
 
 void USpoutSender::TickThread() const
