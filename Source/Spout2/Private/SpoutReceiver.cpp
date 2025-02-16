@@ -3,9 +3,9 @@
 
 void USpoutReceiver::BeginDestroy()
 {
-	Super::BeginDestroy();
-	Receiver.Reset();
+	if (Receiver.IsValid()) Receiver.Reset();
 	Receiver = nullptr;
+	Super::BeginDestroy();
 }
 
 void USpoutReceiver::BeginPlay()
@@ -56,6 +56,7 @@ bool USpoutReceiver::Connect(
 void USpoutReceiver::StopReceive()
 {
 	if (TickProvider) delete TickProvider;
+	TickProvider = nullptr;
 	bIsReceiving = false;
 }
 

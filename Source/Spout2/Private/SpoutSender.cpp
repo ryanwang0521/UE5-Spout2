@@ -3,9 +3,8 @@
 
 void USpoutSender::BeginDestroy()
 {
+	Stop();
 	Super::BeginDestroy();
-	delete TickProvider;
-	Sender.Reset();
 }
 
 bool USpoutSender::Start(
@@ -34,8 +33,9 @@ bool USpoutSender::Start(
 void USpoutSender::Stop()
 {
 	if (TickProvider) delete TickProvider;
-	Sender.Reset();
+	if (Sender.IsValid()) Sender.Reset();
 	Sender = nullptr;
+	TickProvider = nullptr;
 	bIsInitialized = false;
 }
 

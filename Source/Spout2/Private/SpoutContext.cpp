@@ -1,9 +1,9 @@
+#include "SpoutContext.h"
 #include <d3d11on12.h>
 #include <d3d11.h>
 #include "SpoutDX.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Windows/AllowWindowsPlatformTypes.h"
-#include "SpoutContext.h"
 
 //////////////////////////////////////////////////////////////////////////
 ///Spout Context
