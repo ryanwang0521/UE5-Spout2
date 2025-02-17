@@ -254,13 +254,15 @@ void SpoutSender::SendCurrentFrame()
 
 	ENQUEUE_RENDER_COMMAND(SpoutSend)([this](FRHICommandListImmediate& RHICmd)
 	{
+		if (!Context.IsValid()) return;
+		
 		//Avoid directly using the source texture
 		//Engine may update the texture during the spout sending process
 		RHICmd.CopyTexture(
 			OutputTexture,
 			OutputTextureBuffer,
 			FRHICopyTextureInfo());
-		
+
 		Context->Spout.SendTexture(OutputTextureBufferD3D);
 	});
 }
@@ -369,7 +371,7 @@ bool SpoutReceiver::UpdateSpoutInfo()
 
 void SpoutReceiver::ReceiveCurrentFrame()
 {
-	if (!TargetTexture || !TargetTextureD3D) return;
+	if (!TargetTexture || !TargetTextureD3D || !Context.IsValid()) return;
 
 	if (Context->Spout.ReceiveTexture(&TargetTextureD3D)){
 		if (Context->Spout.IsUpdated()) UpdateSpoutInfo();
