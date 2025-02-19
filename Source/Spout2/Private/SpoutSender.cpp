@@ -12,8 +12,9 @@ bool USpoutSender::Start(
 	UTextureRenderTarget2D* Source,
 	const double FrameRate)
 {
-	if (!Source) return false;
-	if (bIsInitialized || Sender.IsValid()) Stop();
+	//if (!Source) return false;
+	//if (bIsInitialized || Sender.IsValid()) Stop();
+	if (!Source || bIsInitialized || Sender.IsValid()) return false;
 
 	Sender = MakeShared<SpoutSender, ESPMode::ThreadSafe>();
 	
@@ -24,7 +25,6 @@ bool USpoutSender::Start(
 	{
 		TickProvider = new FTickProvider(FrameRate);
 		TickProvider->Tick.AddUObject(this, &USpoutSender::TickThread);
-
 	}
 	
 	return bIsInitialized;
@@ -32,10 +32,14 @@ bool USpoutSender::Start(
 
 void USpoutSender::Stop()
 {
-	if (TickProvider) delete TickProvider;
+	if (TickProvider)
+	{
+		delete TickProvider;
+		TickProvider = nullptr;
+		FlushRenderingCommands();
+	}
 	if (Sender.IsValid()) Sender.Reset();
 	Sender = nullptr;
-	TickProvider = nullptr;
 	bIsInitialized = false;
 }
 
