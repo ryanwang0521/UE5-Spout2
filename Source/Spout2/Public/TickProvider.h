@@ -1,7 +1,7 @@
 ﻿#pragma once
 #include "CoreMinimal.h"
 
-DECLARE_MULTICAST_DELEGATE(FTickProviderTick);
+DECLARE_DELEGATE(FTickProviderTick);
 
 class FTickProvider : public FRunnable
 {
@@ -28,10 +28,9 @@ public:
 		{
 			double CurrentTime = GetCurrentTime();
 			if (CurrentTime < NextFrameTime) continue;
-
-			//FScopeLock Lock(&Mutex);
-			Tick.Broadcast();
+			
 			NextFrameTime = GetNextUpdateTime(FPS, CurrentTime);
+			if (Tick.IsBound()) Tick.Execute();
 		}
 		return 0;
 	}

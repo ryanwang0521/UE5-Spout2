@@ -24,7 +24,7 @@ bool USpoutSender::Start(
 	if (bIsInitialized)
 	{
 		TickProvider = new FTickProvider(FrameRate);
-		TickProvider->Tick.AddUObject(this, &USpoutSender::TickThread);
+		TickProvider->Tick.BindUObject(this, &USpoutSender::TickThread);
 	}
 	
 	return bIsInitialized;
