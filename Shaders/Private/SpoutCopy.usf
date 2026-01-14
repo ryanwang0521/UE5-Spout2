@@ -1,0 +1,18 @@
+#include "/Engine/Public/Platform.ush"
+
+Texture2D<float4> InputTexture;
+RWTexture2D<float4> OutputTexture;
+
+[numthreads(8, 8, 1)]
+void MainCS(uint3 ThreadId : SV_DispatchThreadID)
+{
+	uint Width, Height;
+	OutputTexture.GetDimensions(Width, Height);
+
+	if (ThreadId.x >= Width || ThreadId.y >= Height)
+	{
+		return;
+	}
+
+	OutputTexture[ThreadId.xy] = InputTexture[ThreadId.xy];
+}

@@ -1,9 +1,13 @@
 #include "SpoutContext.h"
+#include "Engine/TextureRenderTarget2D.h"
+#include "SpoutCopyShader.h"
+#include "RenderGraphUtils.h"
+
+#include "Windows/AllowWindowsPlatformTypes.h"
 #include <d3d11on12.h>
 #include <d3d11.h>
 #include "SpoutDX.h"
-#include "Engine/TextureRenderTarget2D.h"
-#include "Windows/AllowWindowsPlatformTypes.h"
+#include "Windows/HideWindowsPlatformTypes.h"
 
 //////////////////////////////////////////////////////////////////////////
 ///Spout Context
@@ -180,23 +184,37 @@ void SpoutSender::SetSenderName(const FString& newName)
 	Context->Spout.SetSenderName(toStr(newName));
 }
 
-bool SpoutSender::SetSenderTexture(UTextureRenderTarget2D* Texture)
+bool SpoutSender::SetSenderTexture(UTextureRenderTarget2D* Texture, int32 InBufferCount)
 {
+	// Ensure all pending render commands (using old buffers) are finished
+	FlushRenderingCommands();
+
 	ResetInfo();
+
+	BufferCount = FMath::Max(1, InBufferCount);
+	BufferIndex = 0;
 	
 	ENQUEUE_RENDER_COMMAND(SpoutSend)
 	([this, Texture](FRHICommandListImmediate& RHICmd)
 	{
 		OutputTexture = Texture->GetRenderTargetResource()->GetRenderTargetTexture();
 		
-		FRHITextureCreateDesc Desc = FRHITextureCreateDesc::Create2D(
-			TEXT("TextureBuffer"),
-			Texture->SizeX,
-			Texture->SizeY,
-			Texture->GetFormat());
-		
-		OutputTextureBuffer = RHICreateTexture(Desc);
-		OutputTextureBufferD3D = Context->GetD3D11Texture(OutputTextureBuffer);
+		for (int32 i = 0; i < BufferCount; i++)
+		{
+			FRHITextureCreateDesc Desc = FRHITextureCreateDesc::Create2D(
+				TEXT("TextureBuffer"),
+				Texture->SizeX,
+				Texture->SizeY,
+				Texture->GetFormat());
+			Desc.AddFlags(ETextureCreateFlags::UAV);
+
+			FTextureRHIRef NewBuffer = RHICreateTexture(Desc);
+			OutputTextureBuffers.Add(NewBuffer);
+
+			ID3D11Texture2D* NewBufferD3D = Context->GetD3D11Texture(NewBuffer);
+			OutputTextureBuffersD3D.Add(NewBufferD3D);
+		}
+
 		DXGI_FORMAT DXGIFormat = Context->ToDXGIFormat(Texture->GetFormat());
 
 		Context->Spout.SetSenderFormat(DXGIFormat);
@@ -208,7 +226,7 @@ bool SpoutSender::SetSenderTexture(UTextureRenderTarget2D* Texture)
 
 	FlushRenderingCommands();
 
-	if (!OutputTextureBufferD3D)
+	if (OutputTextureBuffersD3D.Num() != BufferCount || OutputTextureBuffersD3D.Contains(nullptr))
 	{
 		ResetInfo();
 		return false;
@@ -229,26 +247,31 @@ void SpoutSender::ResetInfo()
 {
 	Source = nullptr;
 	OutputTexture = nullptr;
-	OutputTextureBuffer = nullptr;
+	OutputTextureBuffers.Empty();
+
+	for (ID3D11Texture2D* BufferD3D : OutputTextureBuffersD3D)
+	{
+		if (BufferD3D)
+		{
+			BufferD3D->Release();
+		}
+	}
+	OutputTextureBuffersD3D.Empty();
+
 	Format = PF_Unknown;
 	Width = Height = 0;
-
-	if (OutputTextureBufferD3D)
-	{
-		OutputTextureBufferD3D->Release();
-	}
 }
 
 void SpoutSender::SendCurrentFrame()
 {
 	if (!Context->DeviceContext
 		|| !OutputTexture.IsValid()
-		|| !OutputTextureBuffer.IsValid()
-		|| !OutputTextureBufferD3D) return;
+		|| OutputTextureBuffers.Num() == 0
+		|| OutputTextureBuffersD3D.Num() == 0) return;
 
 	if (CheckOutputInfoChanged())
 	{
-		SetSenderTexture(Source);
+		SetSenderTexture(Source, BufferCount);
 		return;
 	}
 
@@ -258,12 +281,30 @@ void SpoutSender::SendCurrentFrame()
 		
 		//Avoid directly using the source texture
 		//Engine may update the texture during the spout sending process
-		RHICmd.CopyTexture(
-			OutputTexture,
-			OutputTextureBuffer,
-			FRHICopyTextureInfo());
+		FTextureRHIRef CurrentBuffer = OutputTextureBuffers[BufferIndex];
+		ID3D11Texture2D* CurrentBufferD3D = OutputTextureBuffersD3D[BufferIndex];
 
-		Context->Spout.SendTexture(OutputTextureBufferD3D);
+		// Dispatch Compute Shader for Copy
+		FSpoutCopyCS::FParameters PassParameters;
+		PassParameters.InputTexture = OutputTexture;
+
+		FUnorderedAccessViewRHIRef CurrentBufferUAV = RHICmd.CreateUnorderedAccessView(CurrentBuffer);
+		PassParameters.OutputTexture = CurrentBufferUAV;
+
+		RHICmd.Transition(FRHITransitionInfo(OutputTexture.GetReference(), ERHIAccess::Unknown, ERHIAccess::SRVCompute));
+		RHICmd.Transition(FRHITransitionInfo(CurrentBuffer.GetReference(), ERHIAccess::Unknown, ERHIAccess::UAVCompute));
+
+		TShaderMapRef<FSpoutCopyCS> ComputeShader(GetGlobalShaderMap(GMaxRHIFeatureLevel));
+		FComputeShaderUtils::Dispatch(RHICmd, ComputeShader, PassParameters,
+			FIntVector(FMath::DivideAndRoundUp(CurrentBuffer->GetSizeX(), 8u),
+					   FMath::DivideAndRoundUp(CurrentBuffer->GetSizeY(), 8u),
+					   1));
+
+		RHICmd.Transition(FRHITransitionInfo(CurrentBuffer.GetReference(), ERHIAccess::UAVCompute, ERHIAccess::SRVCompute));
+
+		Context->Spout.SendTexture(CurrentBufferD3D);
+
+		BufferIndex = (BufferIndex + 1) % BufferCount;
 	});
 }
 

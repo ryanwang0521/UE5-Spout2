@@ -14,8 +14,10 @@ private:
 	TSharedPtr<SpoutContext> Context;
 	UTextureRenderTarget2D* Source;
 	FTextureRHIRef OutputTexture = nullptr;
-	FTextureRHIRef OutputTextureBuffer = nullptr;
-	ID3D11Texture2D* OutputTextureBufferD3D = nullptr;
+	TArray<FTextureRHIRef> OutputTextureBuffers;
+	TArray<ID3D11Texture2D*> OutputTextureBuffersD3D;
+	int32 BufferIndex = 0;
+	int32 BufferCount = 1;
 	
 	double NextFrameTime = 0;
 	
@@ -28,7 +30,7 @@ public:
 	~SpoutSender();
 
 	void SetSenderName(const FString& newName);
-	bool SetSenderTexture(UTextureRenderTarget2D* Texture);
+	bool SetSenderTexture(UTextureRenderTarget2D* Texture, int32 BufferCount = 1);
 	void SendCurrentFrame();
 };
 

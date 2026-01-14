@@ -1,60 +1,60 @@
 # UE5 Spout2 Plugin
 
-## Overview
+A plugin for **Unreal Engine 5** that enables sending and receiving textures using the **Spout2 protocol** for texture sharing between applications.
 
-This plugin for Unreal Engine 5 allows the engine to receive and send textures using the Spout2 protocol.
+---
 
-**Tested Environment**
+## 🧩 Supported Environment
 
-* Unreal Engine 5.3
-* DirectX 12
+- **Unreal Engine:** 5.7.1  
+- **Graphics API:** DirectX 12 (also supports DirectX 11)
 
-**Notes**
+> ⚠️ Other environments may work, but testing is recommended.
 
-* This plugin only supports DirectX 12 and DirectX 11.
-* You might need to test it yourself if you're using a different environment.
+---
 
-# Installation
+## 📦 Installation
 
-1. Extract the downloaded zip file to the `Plugins` folder of your UE5 project.
-2. Regenerate Visual Studio project files.
+1. Extract the downloaded `.zip` file into your project's `Plugins` folder.  
+2. Regenerate Visual Studio project files.  
+3. Rebuild and open your Unreal Engine project.
 
-# Usage
+---
 
-* Add Spout Sender / Receiver to your Blueprint Actor.
-  
-  <img src="https://github.com/ryanwang0521/UE5-Spout2/blob/master/images/AddComponent.jpg" height="150">
+## 🚀 Usage
 
-# Spout Receiver
+Add **Spout Sender** or **Spout Receiver** components to your Blueprint Actor.
 
-* Use Get First Source / Get List to search available spout sources.
-  
-  <img src="https://github.com/ryanwang0521/UE5-Spout2/blob/master/images/SearchSource.jpg" height="250">
+![Add Component](https://github.com/ryanwang0521/UE5-Spout2/blob/master/images/AddComponent.jpg)
 
-* Connect to source
+---
 
-  <img src="https://github.com/ryanwang0521/UE5-Spout2/blob/master/images/Connect.jpg" height="250">
+### 🎥 Spout Receiver
 
-* Change receiving speed
+1. **Search for available sources**  
+   Use `Get First Source` or `Get List` to find active Spout sources.  
+   ![Search Source](https://github.com/ryanwang0521/UE5-Spout2/blob/master/images/SearchSource.jpg)
 
-  <img src="https://github.com/ryanwang0521/UE5-Spout2/blob/master/images/ChangeFPS.jpg" height="200">
+2. **Connect to a source**  
+   ![Connect](https://github.com/ryanwang0521/UE5-Spout2/blob/master/images/Connect.jpg)
 
-* Stop receiving
+3. **Stop receiving**  
+   ![Stop Receiving](https://github.com/ryanwang0521/UE5-Spout2/blob/master/images/StopRecv.jpg)
 
-  <img src="https://github.com/ryanwang0521/UE5-Spout2/blob/master/images/StopRecv.jpg" height="200">
+---
 
-# Spout Sender
+### 📡 Spout Sender
 
-* Start sending
+1. **Start sending**  
+   ![Start Sending](https://github.com/ryanwang0521/UE5-Spout2/blob/master/images/StartSend.jpg)
 
-  <img src="https://github.com/ryanwang0521/UE5-Spout2/blob/master/images/StartSend.jpg" height="250">
+2. **Stop sending**  
+   ![Stop Sending](https://github.com/ryanwang0521/UE5-Spout2/blob/master/images/StopSend.jpg)
 
-* Change sending speed
+---
 
-  <img src="https://github.com/ryanwang0521/UE5-Spout2/blob/master/images/ChangeSendFPS.jpg" height="200">
+## 📝 Notes
 
-* Stop sending
-
-  <img src="https://github.com/ryanwang0521/UE5-Spout2/blob/master/images/StopSend.jpg" height="150">
-
-  
+- Designed for **DirectX 12**, compatible with **DirectX 11**.  
+- Cross-version behavior may vary; please verify in your setup.  
+- Useful for real-time texture sharing between UE5 and external visual applications supporting Spout.

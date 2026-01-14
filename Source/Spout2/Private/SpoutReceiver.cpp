@@ -1,6 +1,13 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 #include "SpoutReceiver.h"
 
+USpoutReceiver::USpoutReceiver()
+{
+	PrimaryComponentTick.bCanEverTick = true;
+	PrimaryComponentTick.bStartWithTickEnabled = true;
+	PrimaryComponentTick.TickGroup = TG_PrePhysics; // Receive early
+}
+
 void USpoutReceiver::BeginDestroy()
 {
 	if (Receiver.IsValid()) Receiver.Reset();
@@ -12,6 +19,13 @@ void USpoutReceiver::BeginPlay()
 {
 	Super::BeginPlay();
 	Receiver = MakeShared<SpoutReceiver>();
+}
+
+void USpoutReceiver::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+{
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+	if (!Receiver.IsValid() || !bIsReceiving) return;
+	Receiver->ReceiveCurrentFrame();
 }
 
 TArray<FString> USpoutReceiver::GetList() const
@@ -28,40 +42,19 @@ bool USpoutReceiver::GetFirstSource(FString& Name) const
 	return bSuccess;
 }
 
-void USpoutReceiver::ChangeFrameRate(const double FrameRate)
-{
-	if (!TickProvider) return;
-	TickProvider->SetFPS(FrameRate);
-}
-
 bool USpoutReceiver::Connect(
 	const FString Name,
-	UTextureRenderTarget2D* Output,
-	const double FrameRate)
+	UTextureRenderTarget2D* Output)
 {
 	if (!Output) return false;
 	if (bIsReceiving) StopReceive();
 
 	bIsReceiving = Receiver->Connect(Name, Output);
-
-	if (bIsReceiving)
-	{
-		TickProvider = new FTickProvider(FrameRate);
-		TickProvider->Tick.BindUObject(this, &USpoutReceiver::TickThread);
-	}
 	
 	return bIsReceiving;
 }
 
 void USpoutReceiver::StopReceive()
 {
-	if (TickProvider) delete TickProvider;
-	TickProvider = nullptr;
 	bIsReceiving = false;
-}
-
-void USpoutReceiver::TickThread() const
-{
-	if (!Receiver.IsValid() || !bIsReceiving) return;
-	Receiver->ReceiveCurrentFrame();
 }

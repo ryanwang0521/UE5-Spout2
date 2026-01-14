@@ -4,7 +4,6 @@
 
 #include "SpoutContext.h"
 #include "CoreMinimal.h"
-#include "TickProvider.h"
 #include "UObject/Object.h"
 #include "SpoutReceiver.generated.h"
 
@@ -14,8 +13,10 @@ class SPOUT2_API USpoutReceiver : public UActorComponent
 	GENERATED_BODY()
 
 public:
+	USpoutReceiver();
 	virtual void BeginDestroy() override;
 	virtual void BeginPlay() override;
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 	UFUNCTION(BlueprintCallable, Category="SpoutReceiver")
 	TArray<FString> GetList() const;
@@ -24,18 +25,12 @@ public:
 	bool GetFirstSource(FString& Name) const;
 
 	UFUNCTION(BlueprintCallable, Category="SpoutReceiver")
-	bool Connect(const FString Name, UTextureRenderTarget2D* Output, const double FrameRate = 60.0);
+	bool Connect(const FString Name, UTextureRenderTarget2D* Output);
 
 	UFUNCTION(BlueprintCallable, Category="SpoutReceiver")
 	void StopReceive();
 
-	UFUNCTION(BlueprintCallable, Category = "SpoutReceiver")
-	void ChangeFrameRate(const double FrameRate = 60.0);
-
-
 private:
 	TSharedPtr<SpoutReceiver> Receiver;
-	FTickProvider* TickProvider;
 	bool bIsReceiving = false;
-	void TickThread() const;
 };

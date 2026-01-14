@@ -1,12 +1,16 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Spout2.h"
+#include "Interfaces/IPluginManager.h"
+#include "ShaderCore.h"
 
 #define LOCTEXT_NAMESPACE "FSpout2Module"
 
 void FSpout2Module::StartupModule()
 {
-	// This code will execute after your module is loaded into memory; the exact timing is specified in the .uplugin file per-module
+	// Map the shader source directory
+	FString PluginShaderDir = FPaths::Combine(IPluginManager::Get().FindPlugin(TEXT("Spout2"))->GetBaseDir(), TEXT("Shaders"));
+	AddShaderSourceDirectoryMapping(TEXT("/Plugin/Spout2"), PluginShaderDir);
 }
 
 void FSpout2Module::ShutdownModule()

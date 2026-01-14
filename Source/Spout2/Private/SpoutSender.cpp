@@ -1,5 +1,14 @@
 #include "SpoutSender.h"
 #include "Engine/TextureRenderTarget2D.h"
+#include "SpoutCopyShader.h"
+
+USpoutSender::USpoutSender()
+{
+	PrimaryComponentTick.bCanEverTick = true;
+	PrimaryComponentTick.bStartWithTickEnabled = true;
+	// Tick after update work to capture the latest frame content
+	PrimaryComponentTick.TickGroup = TG_PostUpdateWork;
+}
 
 void USpoutSender::BeginDestroy()
 {
@@ -7,10 +16,17 @@ void USpoutSender::BeginDestroy()
 	Super::BeginDestroy();
 }
 
+void USpoutSender::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+{
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+	if (!Sender.IsValid() || !bIsInitialized) return;
+	Sender->SendCurrentFrame();
+}
+
 bool USpoutSender::Start(
 	const FString& SenderName,
 	UTextureRenderTarget2D* Source,
-	const double FrameRate)
+	int32 BufferCount)
 {
 	//if (!Source) return false;
 	//if (bIsInitialized || Sender.IsValid()) Stop();
@@ -19,38 +35,14 @@ bool USpoutSender::Start(
 	Sender = MakeShared<SpoutSender, ESPMode::ThreadSafe>();
 	
 	Sender->SetSenderName(SenderName);
-	bIsInitialized = Sender->SetSenderTexture(Source);
-
-	if (bIsInitialized)
-	{
-		TickProvider = new FTickProvider(FrameRate);
-		TickProvider->Tick.BindUObject(this, &USpoutSender::TickThread);
-	}
+	bIsInitialized = Sender->SetSenderTexture(Source, BufferCount);
 	
 	return bIsInitialized;
 }
 
 void USpoutSender::Stop()
 {
-	if (TickProvider)
-	{
-		delete TickProvider;
-		TickProvider = nullptr;
-		FlushRenderingCommands();
-	}
 	if (Sender.IsValid()) Sender.Reset();
 	Sender = nullptr;
 	bIsInitialized = false;
-}
-
-void USpoutSender::ChangeFrameRate(const double FrameRate)
-{
-	if (!TickProvider) return;
-	TickProvider->SetFPS(FrameRate);
-}
-
-void USpoutSender::TickThread() const
-{
-	if (!Sender.IsValid() || !bIsInitialized) return;
-	Sender->SendCurrentFrame();
 }
