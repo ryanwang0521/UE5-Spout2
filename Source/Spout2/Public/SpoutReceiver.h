@@ -29,6 +29,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="SpoutReceiver")
 	void StopReceive();
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spout")
+	bool bForceSRGB = false;
 
 private:
 	TSharedPtr<SpoutReceiver> Receiver;

@@ -45,6 +45,7 @@ public class Spout2 : ModuleRules
 				"Engine",
 				"Slate",
 				"SlateCore",
+				"Renderer",
 				"RenderCore",
 				"RHI",
 				"Projects"

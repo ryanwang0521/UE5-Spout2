@@ -1,11 +1,12 @@
 #include "SpoutContext.h"
 #include "Engine/TextureRenderTarget2D.h"
-#include "SpoutCopyShader.h"
 #include "RenderGraphUtils.h"
 
 #include "Windows/AllowWindowsPlatformTypes.h"
 #include <d3d11on12.h>
 #include <d3d11.h>
+
+#include "ScreenPass.h"
 #include "SpoutDX.h"
 #include "Windows/HideWindowsPlatformTypes.h"
 
@@ -55,6 +56,7 @@ private:
 	}
 
 public:
+	
 	SpoutContext()
 	{
 		InitSpout();
@@ -154,11 +156,11 @@ public:
 		switch (Format)
 		{
 			case PF_R8G8B8A8:		return DXGI_FORMAT_R8G8B8A8_UNORM;
+			case PF_B8G8R8A8:		return DXGI_FORMAT_B8G8R8A8_UNORM;
 			case PF_A2B10G10R10:	return DXGI_FORMAT_R10G10B10A2_UNORM;
-			case PF_FloatRGB:		return DXGI_FORMAT_R11G11B10_FLOAT;
 			case PF_FloatRGBA:		return DXGI_FORMAT_R16G16B16A16_FLOAT;
 			case PF_A16B16G16R16:	return DXGI_FORMAT_R16G16B16A16_UNORM;
-			default:				return DXGI_FORMAT_UNKNOWN;
+			default:				return DXGI_FORMAT_B8G8R8A8_UNORM;
 		}
 	}
 };
@@ -186,28 +188,38 @@ void SpoutSender::SetSenderName(const FString& newName)
 
 bool SpoutSender::SetSenderTexture(UTextureRenderTarget2D* Texture, int32 InBufferCount)
 {
-	// Ensure all pending render commands (using old buffers) are finished
-	FlushRenderingCommands();
+	if (!Texture) return false;
 
+	FlushRenderingCommands();
 	ResetInfo();
 
 	BufferCount = FMath::Max(1, InBufferCount);
 	BufferIndex = 0;
 	
-	ENQUEUE_RENDER_COMMAND(SpoutSend)
-	([this, Texture](FRHICommandListImmediate& RHICmd)
+	int32 NewWidth = Texture->SizeX;
+	int32 NewHeight = Texture->SizeY;
+
+	EPixelFormat NewFormat = Texture->GetFormat();
+	DXGI_FORMAT DXGIFormat = Context->ToDXGIFormat(NewFormat);
+
+	ENQUEUE_RENDER_COMMAND(SpoutSendSetup)
+	([this, NewWidth, NewHeight, NewFormat, DXGIFormat](FRHICommandListImmediate& RHICmd)
 	{
-		OutputTexture = Texture->GetRenderTargetResource()->GetRenderTargetTexture();
-		
 		for (int32 i = 0; i < BufferCount; i++)
 		{
 			FRHITextureCreateDesc Desc = FRHITextureCreateDesc::Create2D(
-				TEXT("TextureBuffer"),
-				Texture->SizeX,
-				Texture->SizeY,
-				Texture->GetFormat());
-			Desc.AddFlags(ETextureCreateFlags::UAV);
+				TEXT("SpoutTextureBuffer"),
+				NewWidth,
+				NewHeight,
+				NewFormat);
 
+			Desc.AddFlags(ETextureCreateFlags::UAV | ETextureCreateFlags::ShaderResource | ETextureCreateFlags::RenderTargetable);
+
+			if (bForceSRGB)
+			{
+				Desc.AddFlags(ETextureCreateFlags::SRGB);
+			}
+			
 			FTextureRHIRef NewBuffer = RHICreateTexture(Desc);
 			OutputTextureBuffers.Add(NewBuffer);
 
@@ -215,16 +227,15 @@ bool SpoutSender::SetSenderTexture(UTextureRenderTarget2D* Texture, int32 InBuff
 			OutputTextureBuffersD3D.Add(NewBufferD3D);
 		}
 
-		DXGI_FORMAT DXGIFormat = Context->ToDXGIFormat(Texture->GetFormat());
-
 		Context->Spout.SetSenderFormat(DXGIFormat);
-		Format = Texture->GetFormat();
-		Width = Texture->SizeX;
-		Height = Texture->SizeY;
-		Source = Texture;
+		Format = NewFormat;
+		Width = NewWidth;
+		Height = NewHeight;
 	});
 
 	FlushRenderingCommands();
+
+	Source = Texture;
 
 	if (OutputTextureBuffersD3D.Num() != BufferCount || OutputTextureBuffersD3D.Contains(nullptr))
 	{
@@ -264,10 +275,7 @@ void SpoutSender::ResetInfo()
 
 void SpoutSender::SendCurrentFrame()
 {
-	if (!Context->DeviceContext
-		|| !OutputTexture.IsValid()
-		|| OutputTextureBuffers.Num() == 0
-		|| OutputTextureBuffersD3D.Num() == 0) return;
+	if (!Context->DeviceContext || !Source || OutputTextureBuffers.Num() == 0 || OutputTextureBuffersD3D.Num() == 0) return;
 
 	if (CheckOutputInfoChanged())
 	{
@@ -275,35 +283,49 @@ void SpoutSender::SendCurrentFrame()
 		return;
 	}
 
-	ENQUEUE_RENDER_COMMAND(SpoutSend)([this](FRHICommandListImmediate& RHICmd)
+	FTextureRenderTargetResource* RTResource = Source->GameThread_GetRenderTargetResource();
+	if (!RTResource) return;
+
+	ENQUEUE_RENDER_COMMAND(SpoutSendFrame)([this, RTResource](FRHICommandListImmediate& RHICmd)
 	{
 		if (!Context.IsValid()) return;
-		
-		//Avoid directly using the source texture
-		//Engine may update the texture during the spout sending process
+
+		FTextureRHIRef CurrentInputRHI = RTResource->GetRenderTargetTexture();
+		if (!CurrentInputRHI) return;
+
 		FTextureRHIRef CurrentBuffer = OutputTextureBuffers[BufferIndex];
 		ID3D11Texture2D* CurrentBufferD3D = OutputTextureBuffersD3D[BufferIndex];
 
-		// Dispatch Compute Shader for Copy
-		FSpoutCopyCS::FParameters PassParameters;
-		PassParameters.InputTexture = OutputTexture;
+		// ==========================================
+		// Start Copy
+		// ==========================================
+		FRDGBuilder GraphBuilder(RHICmd);
 
-		FUnorderedAccessViewRHIRef CurrentBufferUAV = RHICmd.CreateUnorderedAccessView(CurrentBuffer);
-		PassParameters.OutputTexture = CurrentBufferUAV;
+		FRDGTextureRef SrcRDG = GraphBuilder.RegisterExternalTexture(CreateRenderTarget(CurrentInputRHI, TEXT("SpoutInput")));
+		FRDGTextureRef DstRDG = GraphBuilder.RegisterExternalTexture(CreateRenderTarget(CurrentBuffer, TEXT("SpoutOutput")));
 
-		RHICmd.Transition(FRHITransitionInfo(OutputTexture.GetReference(), ERHIAccess::Unknown, ERHIAccess::SRVCompute));
-		RHICmd.Transition(FRHITransitionInfo(CurrentBuffer.GetReference(), ERHIAccess::Unknown, ERHIAccess::UAVCompute));
+		//AddCopyTexturePass(GraphBuilder, SrcRDG, DstRDG);
+		
+		FScreenPassViewInfo ViewInfo;
+		FIntPoint TextureSize(this->Width, this->Height);
 
-		TShaderMapRef<FSpoutCopyCS> ComputeShader(GetGlobalShaderMap(GMaxRHIFeatureLevel));
-		FComputeShaderUtils::Dispatch(RHICmd, ComputeShader, PassParameters,
-			FIntVector(FMath::DivideAndRoundUp(CurrentBuffer->GetSizeX(), 8u),
-					   FMath::DivideAndRoundUp(CurrentBuffer->GetSizeY(), 8u),
-					   1));
+		AddDrawTexturePass(
+			GraphBuilder,
+			ViewInfo,
+			SrcRDG,
+			DstRDG,
+			FIntPoint::ZeroValue,
+			FIntPoint::ZeroValue,
+			TextureSize
+		);
 
-		RHICmd.Transition(FRHITransitionInfo(CurrentBuffer.GetReference(), ERHIAccess::UAVCompute, ERHIAccess::SRVCompute));
+		GraphBuilder.Execute();
+		// ==========================================
 
+		// Send
 		Context->Spout.SendTexture(CurrentBufferD3D);
 
+		// Set buffer
 		BufferIndex = (BufferIndex + 1) % BufferCount;
 	});
 }
@@ -359,8 +381,15 @@ bool SpoutReceiver::Connect(const FString& Name, UTextureRenderTarget2D* BindTex
 	Context->Spout.SetReceiverName(NameChar);
 	Context->Spout.ReceiveTexture();
 
+	Width = 0;
+	Height = 0;
+	Format = DXGI_FORMAT_UNKNOWN;
+
 	bool bSuccess = UpdateSpoutInfo();
-	if (!bSuccess) Context->Spout.SetReceiverName();
+	if (!bSuccess) 
+	{
+		Context->Spout.SetReceiverName();
+	}
 
 	return bSuccess;
 }
@@ -376,17 +405,15 @@ bool SpoutReceiver::UpdateSpoutInfo()
 	DXGI_FORMAT newFormat = Spout->GetSenderFormat();
 	EPixelFormat newEPixelFormat = Context->ToEPixelFormat(newFormat);
 	
-	if (newWidth < 1
-		|| newHeight < 1
-		|| newEPixelFormat == PF_Unknown) return false;
+	if (newWidth < 1 || newHeight < 1 || newEPixelFormat == PF_Unknown) return false;
 	
-	if(newWidth != Width
-	|| newHeight != Height
-	|| newFormat != Format)
+	if(newWidth != Width || newHeight != Height || newFormat != Format)
 	{
-		TargetTexture->ResizeTarget(newWidth, newHeight);
-		TargetTexture->OverrideFormat = newEPixelFormat;
-		TargetTexture->UpdateResource();
+		bool bIsSRGB =  bForceSRGB ? true : (newFormat == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB);
+
+		TargetTexture->SRGB = bIsSRGB;
+		TargetTexture->InitCustomFormat(newWidth, newHeight, newEPixelFormat, !bIsSRGB);
+		TargetTexture->UpdateResourceImmediate(true);
 		
 		ID3D11Texture2D* newTextureD3D = nullptr;
 
@@ -397,8 +424,7 @@ bool SpoutReceiver::UpdateSpoutInfo()
 			FTextureRHIRef RHI = TargetTexture->GetResource()->GetTextureRHI();
 			newTextureD3D = Context->GetD3D11Texture(RHI);
 		});
-
-		//Wait Rendering Thread get RHI
+		
 		FlushRenderingCommands();
 		if (!newTextureD3D) return false;
 
@@ -407,6 +433,7 @@ bool SpoutReceiver::UpdateSpoutInfo()
 		Format = newFormat;
 		TargetTextureD3D = newTextureD3D;
 	}
+	
 	return true;
 }
 

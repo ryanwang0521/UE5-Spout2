@@ -1,6 +1,5 @@
 #include "SpoutSender.h"
 #include "Engine/TextureRenderTarget2D.h"
-#include "SpoutCopyShader.h"
 
 USpoutSender::USpoutSender()
 {
@@ -35,6 +34,7 @@ bool USpoutSender::Start(
 	Sender = MakeShared<SpoutSender, ESPMode::ThreadSafe>();
 	
 	Sender->SetSenderName(SenderName);
+	Sender->bForceSRGB = bForceSRGB;
 	bIsInitialized = Sender->SetSenderTexture(Source, BufferCount);
 	
 	return bIsInitialized;

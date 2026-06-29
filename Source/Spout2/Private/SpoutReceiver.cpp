@@ -48,7 +48,8 @@ bool USpoutReceiver::Connect(
 {
 	if (!Output) return false;
 	if (bIsReceiving) StopReceive();
-
+	
+	Receiver->bForceSRGB = bForceSRGB;
 	bIsReceiving = Receiver->Connect(Name, Output);
 	
 	return bIsReceiving;

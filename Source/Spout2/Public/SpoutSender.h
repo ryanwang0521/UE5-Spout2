@@ -19,6 +19,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "SpoutSender")
 	void Stop();
+	
+	UPROPERTY(EditAnywhere)
+	bool bForceSRGB = false;
 
 private:
 	TSharedPtr<SpoutSender> Sender;

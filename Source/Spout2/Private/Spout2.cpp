@@ -9,8 +9,8 @@
 void FSpout2Module::StartupModule()
 {
 	// Map the shader source directory
-	FString PluginShaderDir = FPaths::Combine(IPluginManager::Get().FindPlugin(TEXT("Spout2"))->GetBaseDir(), TEXT("Shaders"));
-	AddShaderSourceDirectoryMapping(TEXT("/Plugin/Spout2"), PluginShaderDir);
+	//FString PluginShaderDir = FPaths::Combine(IPluginManager::Get().FindPlugin(TEXT("Spout2"))->GetBaseDir(), TEXT("Shaders"));
+	//AddShaderSourceDirectoryMapping(TEXT("/Plugin/Spout2"), PluginShaderDir);
 }
 
 void FSpout2Module::ShutdownModule()

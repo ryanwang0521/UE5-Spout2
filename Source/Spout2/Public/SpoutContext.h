@@ -29,6 +29,8 @@ public:
 	SpoutSender();
 	~SpoutSender();
 
+	bool bForceSRGB = false;
+	
 	void SetSenderName(const FString& newName);
 	bool SetSenderTexture(UTextureRenderTarget2D* Texture, int32 BufferCount = 1);
 	void SendCurrentFrame();
@@ -47,13 +49,15 @@ private:
 	DXGI_FORMAT Format;
 	
 	double NextFrameTime = 0;
-
+	
 	bool UpdateSpoutInfo();
 	
 public:
 	SpoutReceiver();
 	~SpoutReceiver();
 	
+	bool bForceSRGB = false;
+
 	TArray<FString> GetList() const;
 	bool Connect(const FString& ConnectedName, UTextureRenderTarget2D* BindTexture);
 	void ReceiveCurrentFrame();
